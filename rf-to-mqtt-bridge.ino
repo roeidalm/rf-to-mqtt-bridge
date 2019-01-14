@@ -8,7 +8,7 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-
+#define MQTT_MAX_PACKET_SIZE 500 //dons't check it yet, but I think it will let you to send longer data to MQTT
 /*I take Main from config
 const char ssid[]  = "XXX";
 const char password[]  = "XXX";
@@ -35,8 +35,8 @@ uint32_t FirstFreeSpeace = esp_get_free_heap_size();
 unsigned long timer_last_keep_ALIVE = 0;
 void setup()
 {
-int RFTRANSMITPIN;
-int RFRECIEVEPIN;
+  int RFTRANSMITPIN;
+  int RFRECIEVEPIN;
   Serial.begin(115200);
 #ifdef ESP32
   esp = 2;
@@ -59,11 +59,11 @@ int RFRECIEVEPIN;
   ELECHOUSE_cc1101.setMHZ(433.92); // Here you can set your basic frequency. The lib calculates the frequency automatically (default = 433.92).The cc1101 can: 300-348 MHZ, 387-464MHZ and 779-928MHZ. Read More info from datasheet.
   ELECHOUSE_cc1101.Init(PA10);     // must be set to initialize the cc1101! set TxPower  PA10, PA7, PA5, PA0, PA_10, PA_15, PA_20, PA_30.
 
-//set the mode to rx
+  //set the mode to rx
   myRfSwitch.enableTransmit(RFTRANSMITPIN);
   myRfSwitch.enableReceive(RFRECIEVEPIN);
   ELECHOUSE_cc1101.SetRx(); // set Recive on
-  
+
   //starting the wifi and the MQTT
   setup_wifi();
   client.setServer(mqtt_server, port);
@@ -71,7 +71,7 @@ int RFRECIEVEPIN;
 
   timer_last_keep_ALIVE = millis() - 1800001;
 
-//OTA
+  //OTA
   ArduinoOTA
       .onStart([]() {
         String type;
@@ -144,14 +144,19 @@ void loop()
       Serial.println("adding number");
       Serial.println(rfButton);
 
-      StaticJsonBuffer<300> JSONbuffer;
+      DynamicJsonBuffer JSONbuffer;
+
       JsonObject &JSONencoder = JSONbuffer.createObject();
       JSONencoder["device"] = clientID;
       JSONencoder["freeSpeace"] = esp_get_free_heap_size();
       JsonArray &values = JSONencoder.createNestedArray("values");
-
-      values.add(rfButton);
-
+      for (i = 0; i < 150; i = i + 1)
+      {
+        if (arrayOfRfs[i] != 0)
+        {
+          values.add(arrayOfRfs[i]);
+        }
+      }
       char JSONmessageBuffer[100];
       JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
       Serial.println("Sending message to MQTT topic..");
@@ -247,7 +252,7 @@ void callback(char *topic, byte *payload, unsigned int length)
   payload[length] = '\0'; // Null terminator used to terminate the char array
   char *message = (char *)payload;
   long rfmsgfromMQTT = atol(message);
-//check if the topic is about done the task in the MQTT
+  //check if the topic is about done the task in the MQTT
   if (strcmp(topic, complateOutTopic) == 0)
   {
     int i;
@@ -260,7 +265,7 @@ void callback(char *topic, byte *payload, unsigned int length)
       }
     }
   }
-//check if the topic is about sending rf signal
+  //check if the topic is about sending rf signal
   if (strcmp(topic, inTopic) == 0)
   {
     // cc1101 set Transmit on
