@@ -322,6 +322,12 @@ void reconnect()
       }
       else
       {
+        // DISCONNECTION BUG FIX-Thanks for Tal
+        if (WiFi.status() != WL_CONNECTED)
+        {
+          setup_wifi();
+        }
+       //****
         Serial.print("failed, rc=");
         Serial.print(client.state());
         Serial.println(" try again in 5 seconds");
