@@ -175,6 +175,48 @@ void loop()
   }
   myRfSwitch.resetAvailable();
 }
+
+JsonObject &createDynamicJsonBuffer()
+{
+
+  DynamicJsonBuffer JSONbuffer;
+
+  JsonObject &JSONencoder = JSONbuffer.createObject();
+  JSONencoder["device"] = clientID;
+  JSONencoder["freeSpeace"] = esp_get_free_heap_size();
+  return JSONencoder;
+}
+
+bool callingMQTT()
+{
+  int i{0};
+  bool retval = false;
+  JsonObject &JSONencoder = createDynamicJsonBuffer();
+  JsonArray &values = JSONencoder.createNestedArray("values");
+  for (i = 0; i < 150; i = i + 1)
+  {
+    if (arrayOfRfs[i] != 0)
+    {
+      values.add(arrayOfRfs[i]);
+    }
+  }
+  //Serial.println(sizeof(values));
+  // if (values.length() > 0)
+  // {
+  //   retval = true;
+  // }
+  char JSONmessageBuffer[100];
+  JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+  Serial.println("Sending message to MQTT topic..");
+  Serial.println(JSONmessageBuffer);
+
+  client.publish(OutTopic, JSONmessageBuffer);
+  Serial.println("message Sent  to MQTT:");
+  Serial.println("Topic: " + String(OutTopic));
+  timer_last_keep_ALIVE = millis();
+
+  return retval;
+}
 void Timers()
 {
 
@@ -183,17 +225,20 @@ void Timers()
 
   if (now - timer_last_keep_ALIVE > 1800000)
   {
-    StaticJsonBuffer<300> JSONbuffer;
-    JsonObject &JSONencoder = JSONbuffer.createObject();
-    JSONencoder["device"] = clientID;
-    JSONencoder["freeSpeace"] = esp_get_free_heap_size();
-    JSONencoder["IM-ALIVE"] = true;
-    char JSONmessageBuffer[100];
-    JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
-    Serial.println("Sending Timer to MQTT topic..");
-    Serial.println(JSONmessageBuffer);
-    client.publish(OutTopic, JSONmessageBuffer);
-    timer_last_keep_ALIVE = now;
+    if (!callingMQTT())
+    {
+      StaticJsonBuffer<300> JSONbuffer;
+      JsonObject &JSONencoder = JSONbuffer.createObject();
+      JSONencoder["device"] = clientID;
+      JSONencoder["freeSpeace"] = esp_get_free_heap_size();
+      JSONencoder["IM-ALIVE"] = true;
+      char JSONmessageBuffer[100];
+      JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+      Serial.println("Sending Timer to MQTT topic..");
+      Serial.println(JSONmessageBuffer);
+      client.publish(OutTopic, JSONmessageBuffer);
+      timer_last_keep_ALIVE = now;
+    }
   }
 }
 void LEDblink()
