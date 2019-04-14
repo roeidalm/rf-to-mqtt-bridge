@@ -25,7 +25,7 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 RCSwitch myRfSwitch = RCSwitch();
 //TaskHandle_t Task1;
-int LED = 13;
+int LED = 2;
 int esp;
 
 long arrayOfRfs[150];
@@ -232,11 +232,11 @@ void setup_wifi()
   WiFi.setHostname(clientID);
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  status = WiFi.begin(ssid, password);
-  while (status)
-  {
-    status = WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password);
+  while (WiFi.RSSI() == 0)
+  {    
     delay(5000);
+    Serial.println("From function: setup wifi");
     printWifiStatus();
     poll_watchdog_sta();
     LEDblinkShort();
@@ -314,6 +314,7 @@ void reconnect()
     }
     else
     {
+      Serial.println(" client.setServer(mqtt_server, port)");
       client.setServer(mqtt_server, port);
       if (client.connect(clientID))
       {
@@ -323,44 +324,43 @@ void reconnect()
       }
       else
       {
-        if (WiFi.status() != WL_CONNECTED)
+        if (WiFi.RSSI() == 0 && !client.connected())
         {
-          status = WiFi.reconnect();
-          while (status)
+          printWifiStatus();
+          WiFi.disconnect();
+          while (WiFi.RSSI() == 0)
           {
-            status = WiFi.reconnect();
+            WiFi.reconnect();
             delay(5000);
+            Serial.println("From function: reconnect");
+            Serial.println("status: " + String(WiFi.RSSI()));
             printWifiStatus();
             poll_watchdog_sta();
             LEDblinkShort();
           }
-          // DISCONNECTION BUG FIX-Thanks for Tal
-          // if (WiFi.status() != WL_CONNECTED)
-          // {
-          //   setup_wifi();
-          // }
-          //****
-          // Serial.print("failed, rc=");
-          // Serial.print(client.state());
-          // Serial.println(" try again in 5 seconds");
         }
       }
     }
     delay(5000);
+    printWifiStatus();
+    poll_watchdog_sta();
   }
   digitalWrite(LED, HIGH);
 }
 
 void setWifiTimeOut()
 {
-  unsigned long watchDogWifTimeOut = +(60000 * watchDogWifiInMin);
+  unsigned long watchDogWifTimeOut = (60000 * watchDogWifiInMin);
 }
 void poll_watchdog_sta()
 {
-  if (WiFi.status() != WL_CONNECTED)
+  if (WiFi.RSSI() == 0 || !client.connected())
   {
+
     if (millis() - watchDogWifTimeOut > (60000 * watchDogWifiInMin))
     {
+      Serial.print("restarting! ");
+      delay(2000);
       ESP.restart();
     }
   }
@@ -369,6 +369,7 @@ void poll_watchdog_sta()
 void printWifiStatus()
 {
   // print the SSID of the network you're attached to:
+
   Serial.print("SSID: ");
   Serial.println(WiFi.SSID());
 
