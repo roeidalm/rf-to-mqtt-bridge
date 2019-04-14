@@ -33,6 +33,9 @@ long arrayOfRfs[150];
 char msg[50];
 uint32_t FirstFreeSpeace = esp_get_free_heap_size();
 unsigned long timer_last_keep_ALIVE = 0;
+unsigned long watchDogWifiInMin = 5;
+unsigned long watchDogWifTimeOut = 0;
+int status = WL_IDLE_STATUS;
 void setup()
 {
   int RFTRANSMITPIN;
@@ -212,11 +215,13 @@ void LEDblinkShort()
   delay(150);
   digitalWrite(LED, LOW);
 }
+
 void setup_wifi()
 {
   LEDblink();
 
   delay(1000);
+  setWifiTimeOut();
   // We start by connecting to a WiFi network
   Serial.println();
   Serial.println("Setting WiFi ");
@@ -224,25 +229,20 @@ void setup_wifi()
   Serial.println("Disconnetting WiFi ");
   WiFi.disconnect();
   delay(100);
-  WiFi.setHostname("RF2Bridge");
+  WiFi.setHostname(clientID);
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED)
+  status = WiFi.begin(ssid, password);
+  while (status)
   {
-    delay(1000);
-    Serial.print(".");
-    Serial.println(WiFi.localIP());
-    Serial.print("Status: ");
-    Serial.println(WiFi.status());
+    status = WiFi.begin(ssid, password);
+    delay(5000);
+    printWifiStatus();
+    poll_watchdog_sta();
     LEDblinkShort();
   }
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  printWifiStatus();
   digitalWrite(LED, HIGH);
 }
 
@@ -297,6 +297,7 @@ void callback(char *topic, byte *payload, unsigned int length)
 
 void reconnect()
 {
+  setWifiTimeOut();
   // Loop until we're reconnected
   while (!client.connected())
   {
@@ -322,18 +323,63 @@ void reconnect()
       }
       else
       {
-        // DISCONNECTION BUG FIX-Thanks for Tal
         if (WiFi.status() != WL_CONNECTED)
         {
-          setup_wifi();
+          status = WiFi.reconnect();
+          while (status)
+          {
+            status = WiFi.reconnect();
+            delay(5000);
+            printWifiStatus();
+            poll_watchdog_sta();
+            LEDblinkShort();
+          }
+          // DISCONNECTION BUG FIX-Thanks for Tal
+          // if (WiFi.status() != WL_CONNECTED)
+          // {
+          //   setup_wifi();
+          // }
+          //****
+          // Serial.print("failed, rc=");
+          // Serial.print(client.state());
+          // Serial.println(" try again in 5 seconds");
         }
-       //****
-        Serial.print("failed, rc=");
-        Serial.print(client.state());
-        Serial.println(" try again in 5 seconds");
       }
     }
     delay(5000);
   }
   digitalWrite(LED, HIGH);
+}
+
+void setWifiTimeOut()
+{
+  unsigned long watchDogWifTimeOut = +(60000 * watchDogWifiInMin);
+}
+void poll_watchdog_sta()
+{
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    if (millis() - watchDogWifTimeOut > (60000 * watchDogWifiInMin))
+    {
+      ESP.restart();
+    }
+  }
+}
+
+void printWifiStatus()
+{
+  // print the SSID of the network you're attached to:
+  Serial.print("SSID: ");
+  Serial.println(WiFi.SSID());
+
+  // print your WiFi shield's IP address:
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
+
+  // print the received signal strength:
+  long rssi = WiFi.RSSI();
+  Serial.print("signal strength (RSSI):");
+  Serial.print(rssi);
+  Serial.println(" dBm");
 }
