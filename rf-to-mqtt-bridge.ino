@@ -19,13 +19,14 @@ const char inTopic[] = "GateWayIn";
 const char OutTopic[] = "GateWayOut";
 const char complateOutTopic[] = "complateGateWayOut";
 const char complateTopic[] = "GateWayComplate";
+const int ledPin = 13;
 */
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 RCSwitch myRfSwitch = RCSwitch();
 //TaskHandle_t Task1;
-int LED = 2;
+int LED = ledPin;
 int esp;
 
 long arrayOfRfs[150];
