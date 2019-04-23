@@ -186,7 +186,7 @@ void Timers()
 
   if (now - timer_last_keep_ALIVE > 1800000)
   {
-    StaticJsonBuffer<300> JSONbuffer;
+    DynamicJsonBuffer JSONbuffer;
     JsonObject &JSONencoder = JSONbuffer.createObject();
     JSONencoder["device"] = clientID;
     JSONencoder["freeSpeace"] = esp_get_free_heap_size();
