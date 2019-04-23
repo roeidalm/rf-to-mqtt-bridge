@@ -9,53 +9,48 @@
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #define MQTT_MAX_PACKET_SIZE 500 //dons't check it yet, but I think it will let you to send longer data to MQTT
-/*I take Main from config
-const char ssid[]  = "XXX";
-const char password[]  = "XXX";
+/*
+
+--I take Main from config--
+
+const char WifiSSID[]  = "XXX";
+const char WifiPassword[]  = "XXX";
+const char MQTTUserName[]  = "XXX";
+const char MQTTPassword[]  = "XXX";
 const char mqtt_server[]  = "XXXX";
 const int port = 1883;
-const char clientID[]  = "RF2Bridge";
+const int ledPin = 13;// this is ome pin I choose, the diffult pin is pin number 2
+*/
+const char clientID[] = "RF2Bridge";
 const char inTopic[] = "GateWayIn";
 const char OutTopic[] = "GateWayOut";
+const char statusTopic[] = "GateWayOut/status";
+const char forceStatusTopic[] = "Forcestatus";
 const char complateOutTopic[] = "complateGateWayOut";
 const char complateTopic[] = "GateWayComplate";
-*/
 
+//set the wifi object
 WiFiClient espClient;
 PubSubClient client(espClient);
 RCSwitch myRfSwitch = RCSwitch();
 //TaskHandle_t Task1;
-int LED = 2;
-int esp;
-
+//the array for the rf inputs
 long arrayOfRfs[150];
 
-char msg[50];
+int esp;
 uint32_t FirstFreeSpeace = esp_get_free_heap_size();
+//watchDogs and keep alive data
 unsigned long timer_last_keep_ALIVE = 0;
 unsigned long watchDogWifiInMin = 5;
 unsigned long watchDogWifTimeOut = 0;
-int status = WL_IDLE_STATUS;
+
 void setup()
 {
-  int RFTRANSMITPIN;
-  int RFRECIEVEPIN;
+  int RFTRANSMITPIN=2;
+  int RFRECIEVEPIN=4;
   Serial.begin(115200);
-#ifdef ESP32
-  esp = 2;
-  RFTRANSMITPIN = 2;
-  RFRECIEVEPIN = 4; // for esp32! Transmit on GPIO pin 2.
-#elif ESP8266
-  esp = 1;
-  RFTRANSMITPIN = 2;
-  RFRECIEVEPIN = 4; // for esp8266! Transmit on pin 5 = D1
-#else
-  esp = 0;
-  RFTRANSMITPIN = 2;
-  RFRECIEVEPIN = 4; // for Arduino! Transmit on pin 6.
-#endif
-  pinMode(LED, OUTPUT);
 
+  pinMode(ledPin, OUTPUT);
   //CC1101 Settings:                (Settings with "//" are optional!)
   ELECHOUSE_cc1101.setESP8266(esp); // esp8266 & Arduino SPI pin settings. Don´t change this line!
   //ELECHOUSE_cc1101.setRxBW(16);     // set Receive filter bandwidth (default = 812khz) 1 = 58khz, 2 = 67khz, 3 = 81khz, 4 = 101khz, 5 = 116khz, 6 = 135khz, 7 = 162khz, 8 = 203khz, 9 = 232khz, 10 = 270khz, 11 = 325khz, 12 = 406khz, 13 = 464khz, 14 = 541khz, 15 = 650khz, 16 = 812khz.
@@ -123,6 +118,8 @@ void loop()
   //waiting to get signal
   if (myRfSwitch.available())
   {
+    LEDblinkShort();
+    digitalWrite(ledPin, HIGH);
     unsigned long rfButton = myRfSwitch.getReceivedValue();
     int i;
     int indexOfZero = 0;
@@ -152,6 +149,8 @@ void loop()
       JsonObject &JSONencoder = JSONbuffer.createObject();
       JSONencoder["device"] = clientID;
       JSONencoder["freeSpeace"] = esp_get_free_heap_size();
+      IPAddress ip = WiFi.localIP();
+      JSONencoder["IP"] = String(ip);
       JsonArray &values = JSONencoder.createNestedArray("values");
       for (i = 0; i < 150; i = i + 1)
       {
@@ -180,40 +179,46 @@ void loop()
 }
 void Timers()
 {
-
-  unsigned long now = millis();
+  //if the rf bridge didn't send data in the 30 min this will send message
   uint32_t freeSpeace = esp_get_free_heap_size();
 
-  if (now - timer_last_keep_ALIVE > 1800000)
+  if (millis() - timer_last_keep_ALIVE > 1800000)
   {
-    DynamicJsonBuffer JSONbuffer;
-    JsonObject &JSONencoder = JSONbuffer.createObject();
-    JSONencoder["device"] = clientID;
-    JSONencoder["freeSpeace"] = esp_get_free_heap_size();
-    JSONencoder["IM-ALIVE"] = true;
-    char JSONmessageBuffer[100];
-    JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
-    Serial.println("Sending Timer to MQTT topic..");
-    Serial.println(JSONmessageBuffer);
-    client.publish(OutTopic, JSONmessageBuffer);
-    timer_last_keep_ALIVE = now;
+    sendStatus();
   }
+}
+//sending the status
+void sendStatus()
+{
+  DynamicJsonBuffer JSONbuffer;
+  JsonObject &JSONencoder = JSONbuffer.createObject();
+  JSONencoder["device"] = clientID;
+  JSONencoder["freeSpeace"] = esp_get_free_heap_size();
+  IPAddress ip = WiFi.localIP();
+  JSONencoder["IP"] = String(ip);
+  JSONencoder["IM-ALIVE"] = true;
+  char JSONmessageBuffer[100];
+  JSONencoder.printTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+  Serial.println("Sending Timer to MQTT topic..");
+  Serial.println(JSONmessageBuffer);
+  client.publish(statusTopic, JSONmessageBuffer);
+  timer_last_keep_ALIVE = millis();
 }
 void LEDblink()
 {
-  digitalWrite(LED, HIGH);
+  digitalWrite(ledPin, HIGH);
   delay(150);
-  digitalWrite(LED, LOW);
+  digitalWrite(ledPin, LOW);
   delay(150);
-  digitalWrite(LED, HIGH);
+  digitalWrite(ledPin, HIGH);
   delay(150);
-  digitalWrite(LED, LOW);
+  digitalWrite(ledPin, LOW);
 }
 void LEDblinkShort()
 {
-  digitalWrite(LED, HIGH);
+  digitalWrite(ledPin, HIGH);
   delay(150);
-  digitalWrite(LED, LOW);
+  digitalWrite(ledPin, LOW);
 }
 
 void setup_wifi()
@@ -231,10 +236,11 @@ void setup_wifi()
   delay(100);
   WiFi.setHostname(clientID);
   Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
+  Serial.println(WifiSSID);
+  WiFi.begin(WifiSSID, WifiPassword);
+  //checking the signal of the wifi if it odd of zero it mine you have wifi
   while (WiFi.RSSI() == 0)
-  {    
+  {
     delay(5000);
     Serial.println("From function: setup wifi");
     printWifiStatus();
@@ -243,15 +249,20 @@ void setup_wifi()
   }
 
   printWifiStatus();
-  digitalWrite(LED, HIGH);
+  digitalWrite(ledPin, HIGH);
 }
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
+  Serial.print("topic in: ");
+  Serial.println(topic);
+  Serial.print("length in: ");
+  Serial.println(length);
   // Conver the incoming byte array to a string
   payload[length] = '\0'; // Null terminator used to terminate the char array
   char *message = (char *)payload;
   long rfmsgfromMQTT = atol(message);
+
   //check if the topic is about done the task in the MQTT
   if (strcmp(topic, complateOutTopic) == 0)
   {
@@ -277,6 +288,8 @@ void callback(char *topic, byte *payload, unsigned int length)
     JsonObject &JSONencoder = JSONbuffer.createObject();
     JSONencoder["device"] = clientID;
     JSONencoder["freeSpeace"] = esp_get_free_heap_size();
+    IPAddress ip = WiFi.localIP();
+    JSONencoder["IP"] = String(ip);
     JsonArray &values = JSONencoder.createNestedArray("values");
 
     values.add(rfmsgfromMQTT);
@@ -292,6 +305,13 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.println("Message Sent on topic: ");
     Serial.println(topic);
     Serial.println(message);
+  }
+  //check if the topic is about force send Status to the server
+  if (strcmp(topic, forceStatusTopic) == 0)
+  {
+    Serial.println("Sending message to MQTT forceStatusTopic..");
+    sendStatus();
+    Serial.println("message Sent to MQTT forceStatusTopic..");
   }
 }
 
@@ -345,7 +365,7 @@ void reconnect()
     printWifiStatus();
     poll_watchdog_sta();
   }
-  digitalWrite(LED, HIGH);
+  digitalWrite(ledPin, HIGH);
 }
 
 void setWifiTimeOut()
