@@ -52,9 +52,23 @@ unsigned long watchDogWifTimeOut = 0;
 
 void setup()
 {
-  int RFTRANSMITPIN = 2;
-  int RFRECIEVEPIN = 4;
+  int RFTRANSMITPIN;
+  int RFRECIEVEPIN;
   Serial.begin(115200);
+  #ifdef ESP32
+  esp = 2;
+  RFTRANSMITPIN = 2;
+  RFRECIEVEPIN = 4; // for esp32! Transmit on GPIO pin 2.
+#elif ESP8266
+  esp = 1;
+  RFTRANSMITPIN = 2;
+  RFRECIEVEPIN = 4; // for esp8266! Transmit on pin 5 = D1
+#else
+  esp = 0;
+  RFTRANSMITPIN = 2;
+  RFRECIEVEPIN = 4; // for Arduino! Transmit on pin 6.
+#endif
+  
 
   String WifiSSID1 = "XXX";
   String WifiPassword1 = "XXX";
