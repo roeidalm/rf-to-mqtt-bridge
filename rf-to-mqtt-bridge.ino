@@ -1,5 +1,7 @@
 
 #include <WiFi.h>
+#include <WiFiMulti.h>
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <RCSwitch.h>
 #include <ArduinoJson.h>
@@ -8,6 +10,7 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+
 #define MQTT_MAX_PACKET_SIZE 500 //dons't check it yet, but I think it will let you to send longer data to MQTT
 /*
 
@@ -30,8 +33,9 @@ const char complateOutTopic[] = "complateGateWayOut";
 const char complateTopic[] = "GateWayComplate";
 
 //set the wifi object
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClientSecure wclient;
+WiFiMulti wifiMulti;
+PubSubClient client(wclient);
 RCSwitch myRfSwitch = RCSwitch();
 //TaskHandle_t Task1;
 //the array for the rf inputs
@@ -46,22 +50,31 @@ unsigned long watchDogWifTimeOut = 0;
 
 void setup()
 {
-  int RFTRANSMITPIN=2;
-  int RFRECIEVEPIN=4;
+  int RFTRANSMITPIN = 2;
+  int RFRECIEVEPIN = 4;
   Serial.begin(115200);
 
-  pinMode(ledPin, OUTPUT);
-  //CC1101 Settings:                (Settings with "//" are optional!)
+  //-------edter here all the wifi connections you have!---------
+
+  wifiMulti.addAP(WifiSSID, WifiPassword);
+  //wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
+
+  //-----------------------
+
+  //-----CC1101 Settings:                (Settings with "//" are optional!)
   ELECHOUSE_cc1101.setESP8266(esp); // esp8266 & Arduino SPI pin settings. Don´t change this line!
   //ELECHOUSE_cc1101.setRxBW(16);     // set Receive filter bandwidth (default = 812khz) 1 = 58khz, 2 = 67khz, 3 = 81khz, 4 = 101khz, 5 = 116khz, 6 = 135khz, 7 = 162khz, 8 = 203khz, 9 = 232khz, 10 = 270khz, 11 = 325khz, 12 = 406khz, 13 = 464khz, 14 = 541khz, 15 = 650khz, 16 = 812khz.
   ELECHOUSE_cc1101.setMHZ(433.92); // Here you can set your basic frequency. The lib calculates the frequency automatically (default = 433.92).The cc1101 can: 300-348 MHZ, 387-464MHZ and 779-928MHZ. Read More info from datasheet.
   ELECHOUSE_cc1101.Init(PA10);     // must be set to initialize the cc1101! set TxPower  PA10, PA7, PA5, PA0, PA_10, PA_15, PA_20, PA_30.
+
+  //---------------------
 
   //set the mode to rx
   myRfSwitch.enableTransmit(RFTRANSMITPIN);
   myRfSwitch.enableReceive(RFRECIEVEPIN);
   ELECHOUSE_cc1101.SetRx(); // set Recive on
 
+  pinMode(ledPin, OUTPUT);
   //starting the wifi and the MQTT
   setup_wifi();
   client.setServer(mqtt_server, port);
@@ -232,12 +245,12 @@ void setup_wifi()
   Serial.println("Setting WiFi ");
   WiFi.mode(WIFI_STA);
   Serial.println("Disconnetting WiFi ");
-  WiFi.disconnect();
-  delay(100);
-  WiFi.setHostname(clientID);
+  // wifiMulti.disconnect();
+  // delay(100);
   Serial.print("Connecting to ");
   Serial.println(WifiSSID);
-  WiFi.begin(WifiSSID, WifiPassword);
+  wifiMulti.run();
+  WiFi.setHostname(clientID);
   //checking the signal of the wifi if it odd of zero it mine you have wifi
   while (WiFi.RSSI() == 0)
   {
@@ -347,10 +360,10 @@ void reconnect()
         if (WiFi.RSSI() == 0 && !client.connected())
         {
           printWifiStatus();
-          WiFi.disconnect();
+          // wifiMulti.disconnect();
+          wifiMulti.run();
           while (WiFi.RSSI() == 0)
           {
-            WiFi.reconnect();
             delay(5000);
             Serial.println("From function: reconnect");
             Serial.println("status: " + String(WiFi.RSSI()));
