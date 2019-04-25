@@ -1,3 +1,5 @@
+#include "config.h"
+#include "WifiData.h"
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -6,16 +8,17 @@
 #include <RCSwitch.h>
 #include <ArduinoJson.h>
 #include <ELECHOUSE_CC1101_RCS_DRV.h>
-#include "config.h"
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <string.h>
 
 #define MQTT_MAX_PACKET_SIZE 500 //dons't check it yet, but I think it will let you to send longer data to MQTT
 /*
 
 --I take Main from config--
 
+const char clientID[] = "RF2Bridge1";
 const char WifiSSID[]  = "XXX";
 const char WifiPassword[]  = "XXX";
 const char MQTTUserName[]  = "XXX";
@@ -24,7 +27,6 @@ const char mqtt_server[]  = "XXXX";
 const int port = 1883;
 const int ledPin = 13;// this is ome pin I choose, the diffult pin is pin number 2
 */
-const char clientID[] = "RF2Bridge";
 const char inTopic[] = "GateWayIn";
 const char OutTopic[] = "GateWayOut";
 const char statusTopic[] = "GateWayOut/status";
@@ -33,7 +35,7 @@ const char complateOutTopic[] = "complateGateWayOut";
 const char complateTopic[] = "GateWayComplate";
 
 //set the wifi object
-WiFiClientSecure wclient;
+WiFiClient wclient;
 WiFiMulti wifiMulti;
 PubSubClient client(wclient);
 RCSwitch myRfSwitch = RCSwitch();
@@ -54,7 +56,16 @@ void setup()
   int RFRECIEVEPIN = 4;
   Serial.begin(115200);
 
+  String WifiSSID1 = "XXX";
+  String WifiPassword1 = "XXX";
+  String MQTTUserName1 = "XXX";
+  String MQTTPassword1 = "XXX";
+  String mqtt_server1 = "XXXX";
   //-------edter here all the wifi connections you have!---------
+  WifiData temparray[] = {{WifiSSID1, WifiPassword1, MQTTUserName1, MQTTPassword1,
+                           mqtt_server1, 1883}};
+  Serial.print("temparray[0].WifiSSID: ");
+  Serial.println(temparray[0].WifiSSID);
 
   wifiMulti.addAP(WifiSSID, WifiPassword);
   //wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
