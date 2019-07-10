@@ -1,5 +1,5 @@
 #include "config.h"
-#include "WifiData.h"
+// #include "WifiData.h"
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -11,7 +11,8 @@
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
-#include <string.h>
+#include <Arduino.h> //for "String" class
+
 
 #define MQTT_MAX_PACKET_SIZE 500 //dons't check it yet, but I think it will let you to send longer data to MQTT
 /*
@@ -55,7 +56,7 @@ void setup()
   int RFTRANSMITPIN;
   int RFRECIEVEPIN;
   Serial.begin(115200);
-  #ifdef ESP32
+#ifdef ESP32
   esp = 2;
   RFTRANSMITPIN = 2;
   RFRECIEVEPIN = 4; // for esp32! Transmit on GPIO pin 2.
@@ -68,8 +69,7 @@ void setup()
   RFTRANSMITPIN = 2;
   RFRECIEVEPIN = 4; // for Arduino! Transmit on pin 6.
 #endif
-  
-
+/*
   String WifiSSID1 = "XXX";
   String WifiPassword1 = "XXX";
   String MQTTUserName1 = "XXX";
@@ -79,10 +79,10 @@ void setup()
   WifiData temparray[] = {{WifiSSID1, WifiPassword1, MQTTUserName1, MQTTPassword1,
                            mqtt_server1, 1883}};
   Serial.print("temparray[0].WifiSSID: ");
-  Serial.println(temparray[0].WifiSSID);
-
+  Serial.println(temparray[0].getSSIDName());
+*/
   wifiMulti.addAP(WifiSSID, WifiPassword);
-  //wifiMulti.addAP("ssid_from_AP_2", "your_password_for_AP_2");
+
 
   //-----------------------
 
@@ -362,7 +362,7 @@ void reconnect()
     LEDblinkShort();
     Serial.print("Attempting MQTT connection...");
     // Attempt to connect
-    if (client.connect(clientID))
+    if (client.connect(clientID,MQTTUserName,MQTTPassword))
     {
       Serial.println("connected");
       client.subscribe(inTopic);
@@ -374,7 +374,7 @@ void reconnect()
     {
       Serial.println(" client.setServer(mqtt_server, port)");
       client.setServer(mqtt_server, port);
-      if (client.connect(clientID))
+      if (client.connect(clientID,MQTTUserName,MQTTPassword))
       {
         Serial.println("connected");
         client.subscribe(inTopic);
