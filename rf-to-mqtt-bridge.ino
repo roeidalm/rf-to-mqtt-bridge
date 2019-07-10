@@ -372,7 +372,14 @@ void reconnect()
     }
     else
     {
-      Serial.println(" client.setServer(mqtt_server, port)");
+      Serial.print("mqtt_server ");
+      Serial.println(mqtt_server);
+      Serial.print("port: ");
+      Serial.println(port);
+      Serial.print("MQTTUserName: ");
+      Serial.println(MQTTUserName);
+      Serial.print("MQTTPassword: ");
+      Serial.println(MQTTPassword);      
       client.setServer(mqtt_server, port);
       if (client.connect(clientID,MQTTUserName,MQTTPassword))
       {
